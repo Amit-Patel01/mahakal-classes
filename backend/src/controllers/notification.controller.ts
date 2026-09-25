@@ -44,17 +44,21 @@ export class NotificationController {
       }
 
       const db = getNativeDb();
-      await db.collection('notifications').updateMany(
-        {
-          ...(ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { id }),
-          recipientId: ObjectId.isValid(recipientId) ? new ObjectId(recipientId) : recipientId,
+      const filter: any = {};
+      if (id && ObjectId.isValid(id)) {
+        filter._id = new ObjectId(id);
+      }
+      if (recipientId && ObjectId.isValid(recipientId)) {
+        filter.recipientId = new ObjectId(recipientId);
+      } else {
+        filter.recipientId = recipientId;
+      }
+
+      await db.collection('notifications').updateMany(filter, {
+        $set: {
+          readAt: new Date(),
         },
-        {
-          $set: {
-            readAt: new Date(),
-          },
-        }
-      );
+      });
 
       res.status(200).json({ success: true, message: 'Marked as read' });
     } catch (error: any) {

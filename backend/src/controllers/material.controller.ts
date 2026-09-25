@@ -57,7 +57,7 @@ export class MaterialController {
       // Use native MongoDB to avoid Prisma replica-set transaction error
       const db = getNativeDb();
       const now = new Date();
-      const doc = {
+      const doc: any = {
         _id: new ObjectId(),
         courseId: new ObjectId(courseId),
         subjectId: new ObjectId(subjectId),
@@ -160,11 +160,16 @@ export class MaterialController {
     try {
       const { id } = req.params;
 
+      if (!id || !ObjectId.isValid(id)) {
+        res.status(404).json({ success: false, message: 'Material not found' });
+        return;
+      }
+
       const db = getNativeDb();
 
       // Find material using native MongoDB
       const material = await db.collection('materials').findOne({
-        _id: ObjectId.isValid(id) ? new ObjectId(id) : null,
+        _id: new ObjectId(id),
       });
 
       if (!material) {

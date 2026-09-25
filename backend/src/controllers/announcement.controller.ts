@@ -16,7 +16,7 @@ export class AnnouncementController {
       // Use native MongoDB to avoid Prisma replica-set transaction error
       const db = getNativeDb();
       const now = new Date();
-      const doc = {
+      const doc: any = {
         _id: new ObjectId(),
         title,
         content,
