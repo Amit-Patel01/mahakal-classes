@@ -1,0 +1,35 @@
+export enum UserRole {
+  STUDENT = 'STUDENT',
+  TEACHER = 'TEACHER',
+  ADMIN = 'ADMIN',
+}
+
+export enum MaterialCategory {
+  NOTES = 'NOTES',
+  PDF = 'PDF',
+  ASSIGNMENT = 'ASSIGNMENT',
+  PREVIOUS_YEAR = 'PREVIOUS_YEAR',
+  SYLLABUS = 'SYLLABUS',
+  IMPORTANT_QUESTION = 'IMPORTANT_QUESTION',
+  STUDY_MATERIAL = 'STUDY_MATERIAL',
+  DOCUMENT = 'DOCUMENT',
+}
+
+export enum LiveStatus {
+  UPCOMING = 'UPCOMING',
+  LIVE = 'LIVE',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum QuestionType {
+  SINGLE_CHOICE = 'SINGLE_CHOICE',
+  MULTIPLE_CHOICE = 'MULTIPLE_CHOICE',
+  TRUE_FALSE = 'TRUE_FALSE',
+}
+
+export enum AttemptStatus {
+  IN_PROGRESS = 'IN_PROGRESS',
+  SUBMITTED = 'SUBMITTED',
+  EXPIRED = 'EXPIRED',
+}

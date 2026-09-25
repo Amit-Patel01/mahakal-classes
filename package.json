@@ -1,0 +1,26 @@
+{
+  "name": "mahakal-classes",
+  "version": "1.0.0",
+  "description": "Mahakal Classes LMS & CBT Platform - MongoDB Native Architecture",
+  "scripts": {
+    "dev": "npm run dev --prefix backend",
+    "dev:all": "node scripts/run-dev.js",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:web": "npm run dev --prefix web",
+    "db:generate": "npm run prisma:generate --prefix backend",
+    "db:push": "npm run prisma:push --prefix backend",
+    "db:seed": "npm run seed --prefix backend",
+    "build": "npm run build --prefix backend && npm run build --prefix web"
+  },
+  "keywords": [
+    "lms",
+    "education",
+    "mongodb",
+    "prisma",
+    "gridfs",
+    "nextjs",
+    "express"
+  ],
+  "author": "Mahakal Classes Team",
+  "license": "ISC"
+}

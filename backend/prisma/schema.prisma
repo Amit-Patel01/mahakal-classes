@@ -1,0 +1,480 @@
+// =================================================================
+// MAHAKAL CLASSES - MONGODB PRISMA SCHEMA DEFINITION
+// =================================================================
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum MaterialCategory {
+  NOTES
+  PDF
+  ASSIGNMENT
+  PREVIOUS_YEAR
+  SYLLABUS
+  IMPORTANT_QUESTION
+  STUDY_MATERIAL
+  DOCUMENT
+}
+
+enum LiveStatus {
+  UPCOMING
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum QuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  EXPIRED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  SUSPENDED
+}
+
+// -----------------------------------------------------------------
+// USER & PROFILES
+// -----------------------------------------------------------------
+
+model User {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  email        String    @unique
+  mobile       String    @unique
+  passwordHash String
+  role         Role      @default(STUDENT)
+  avatarFileId String?   // MongoDB GridFS File ObjectId reference
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Profiles
+  studentProfile StudentProfile?
+  teacherProfile TeacherProfile?
+
+  // Relations
+  enrollments      Enrollment[]
+  testAttempts     TestAttempt[]
+  lectureProgress  LectureProgress[]
+  notifications    Notification[]
+  materialsUploaded Material[]
+  lecturesTaught   Lecture[]
+  liveClassesTaught LiveClass[]
+  testsCreated     Test[]
+  announcements    Announcement[]
+
+  @@map("users")
+}
+
+model StudentProfile {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String   @unique @db.ObjectId
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enrollmentNumber String   @unique
+  courseId         String?  @db.ObjectId
+  course           Course?  @relation(fields: [courseId], references: [id])
+  parentContact    String?
+  address          String?
+  academicGoal     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("student_profiles")
+}
+
+model TeacherProfile {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String   @unique @db.ObjectId
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  designation     String   @default("Faculty")
+  qualification   String
+  bio             String?
+  experienceYears Int      @default(0)
+  specialization  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("teacher_profiles")
+}
+
+// -----------------------------------------------------------------
+// ACADEMIC STRUCTURE: COURSES, SUBJECTS, CHAPTERS, ENROLLMENTS
+// -----------------------------------------------------------------
+
+model Course {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  title           String
+  slug            String   @unique
+  code            String   @unique
+  description     String
+  thumbnailFileId String?  // GridFS File ObjectId
+  duration        String
+  price           Float    @default(0.0)
+  isPublished     Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  subjects        Subject[]
+  enrollments     Enrollment[]
+  materials       Material[]
+  lectures        Lecture[]
+  liveClasses     LiveClass[]
+  tests           Test[]
+  studentProfiles StudentProfile[]
+  announcements   Announcement[]
+
+  @@map("courses")
+}
+
+model Subject {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  courseId    String   @db.ObjectId
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  name        String
+  code        String
+  description String?
+  icon        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  chapters    Chapter[]
+  materials   Material[]
+  lectures    Lecture[]
+  liveClasses LiveClass[]
+  tests       Test[]
+
+  @@unique([courseId, code])
+  @@map("subjects")
+}
+
+model Chapter {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  subjectId   String   @db.ObjectId
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  title       String
+  orderIndex  Int      @default(0)
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  materials   Material[]
+  lectures    Lecture[]
+
+  @@map("chapters")
+}
+
+model Enrollment {
+  id         String           @id @default(auto()) @map("_id") @db.ObjectId
+  studentId  String           @db.ObjectId
+  student    User             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseId   String           @db.ObjectId
+  course     Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  status     EnrollmentStatus @default(ACTIVE)
+  enrolledAt DateTime         @default(now())
+
+  @@unique([studentId, courseId])
+  @@map("enrollments")
+}
+
+// -----------------------------------------------------------------
+// HE MATERIAL (STUDY MATERIALS, PDFS, ASSIGNMENTS)
+// -----------------------------------------------------------------
+
+model Material {
+  id           String           @id @default(auto()) @map("_id") @db.ObjectId
+  courseId     String           @db.ObjectId
+  course       Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  subjectId    String           @db.ObjectId
+  subject      Subject          @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  chapterId    String?          @db.ObjectId
+  chapter      Chapter?         @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  title        String
+  description  String?
+  category     MaterialCategory @default(NOTES)
+  fileId       String           // GridFS File ObjectId string
+  fileName     String
+  fileType     String
+  fileSize     Int              // Bytes
+  uploadedById String           @db.ObjectId
+  uploadedBy   User             @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  downloadCount Int             @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@map("materials")
+}
+
+// -----------------------------------------------------------------
+// RECORDED LECTURES & PROGRESS TRACKING
+// -----------------------------------------------------------------
+
+model Lecture {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  courseId        String   @db.ObjectId
+  course          Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  subjectId       String   @db.ObjectId
+  subject         Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  chapterId       String?  @db.ObjectId
+  chapter         Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  teacherId       String   @db.ObjectId
+  teacher         User     @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  title           String
+  description     String?
+  videoFileId     String?  // GridFS File ObjectId or external streaming URL
+  videoUrl        String?  // Optional external URL (e.g. YouTube/Vimeo embed)
+  durationMinutes Int      @default(0)
+  thumbnailFileId String?  // GridFS File ObjectId
+  orderIndex      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  progressList    LectureProgress[]
+
+  @@map("lectures")
+}
+
+model LectureProgress {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  studentId      String    @db.ObjectId
+  student        User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lectureId      String    @db.ObjectId
+  lecture        Lecture   @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+  watchedSeconds Int       @default(0)
+  isCompleted    Boolean   @default(false)
+  lastWatchedAt  DateTime  @default(now())
+
+  @@unique([studentId, lectureId])
+  @@map("lecture_progress")
+}
+
+// -----------------------------------------------------------------
+// LIVE LECTURES
+// -----------------------------------------------------------------
+
+model LiveClass {
+  id              String     @id @default(auto()) @map("_id") @db.ObjectId
+  courseId        String     @db.ObjectId
+  course          Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  subjectId       String     @db.ObjectId
+  subject         Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacherId       String     @db.ObjectId
+  teacher         User       @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  title           String
+  description     String?
+  scheduledDate   DateTime
+  startTime       String     // e.g. "10:00 AM"
+  endTime         String     // e.g. "11:30 AM"
+  streamUrl       String     // External Stream / Room URL (Zoom / YouTube Live / RTMP)
+  streamPlatform  String     @default("YouTube Live")
+  thumbnailFileId String?    // GridFS File ObjectId
+  status          LiveStatus @default(UPCOMING)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@map("live_classes")
+}
+
+// -----------------------------------------------------------------
+// ONLINE EXAMINATION SYSTEM (TESTS, QUESTIONS, ATTEMPTS, RESULTS)
+// -----------------------------------------------------------------
+
+model Test {
+  id                  String        @id @default(auto()) @map("_id") @db.ObjectId
+  courseId            String        @db.ObjectId
+  course              Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  subjectId           String        @db.ObjectId
+  subject             Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacherId           String        @db.ObjectId
+  teacher             User          @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  title               String
+  description         String?
+  durationMinutes     Int           @default(60)
+  totalMarks          Float         @default(100.0)
+  passingMarks        Float         @default(40.0)
+  negativeMarkingRate Float         @default(0.25) // e.g. 0.25 means -25% of question mark deducted
+  startsAt            DateTime?
+  endsAt              DateTime?
+  instructions        String?
+  isPublished         Boolean       @default(false)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  // Relations
+  questions           Question[]
+  attempts            TestAttempt[]
+
+  @@map("tests")
+}
+
+model Question {
+  id                  String         @id @default(auto()) @map("_id") @db.ObjectId
+  testId              String         @db.ObjectId
+  test                Test           @relation(fields: [testId], references: [id], onDelete: Cascade)
+  questionText        String
+  questionImageFileId String?        // GridFS File ObjectId
+  type                QuestionType   @default(SINGLE_CHOICE)
+  marks               Float          @default(4.0)
+  negativeMarks       Float          @default(1.0)
+  explanation         String?
+  orderIndex          Int            @default(0)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  // Relations
+  options             QuestionOption[]
+  answers             Answer[]
+
+  @@map("questions")
+}
+
+model QuestionOption {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  questionId       String   @db.ObjectId
+  question         Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  optionText       String
+  optionImageFileId String? // GridFS File ObjectId
+  isCorrect        Boolean  @default(false)
+  orderIndex       Int      @default(0)
+
+  @@map("question_options")
+}
+
+model TestAttempt {
+  id               String        @id @default(auto()) @map("_id") @db.ObjectId
+  testId           String        @db.ObjectId
+  test             Test          @relation(fields: [testId], references: [id], onDelete: Cascade)
+  studentId        String        @db.ObjectId
+  student          User          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  startedAt        DateTime      @default(now())
+  submittedAt      DateTime?
+  timeTakenSeconds Int           @default(0)
+  totalQuestions   Int           @default(0)
+  attemptedCount   Int           @default(0)
+  correctCount     Int           @default(0)
+  wrongCount       Int           @default(0)
+  unattemptedCount Int           @default(0)
+  totalScore       Float         @default(0.0)
+  percentage       Float         @default(0.0)
+  isPassed         Boolean       @default(false)
+  status           AttemptStatus @default(IN_PROGRESS)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  // Relations
+  answers          Answer[]
+
+  @@map("test_attempts")
+}
+
+model Answer {
+  id                String      @id @default(auto()) @map("_id") @db.ObjectId
+  attemptId         String      @db.ObjectId
+  attempt           TestAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId        String      @db.ObjectId
+  question          Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedOptionIds String[]    // IDs of selected QuestionOption documents
+  isCorrect         Boolean     @default(false)
+  marksAwarded      Float       @default(0.0)
+  isMarkedForReview Boolean     @default(false)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@unique([attemptId, questionId])
+  @@map("answers")
+}
+
+// -----------------------------------------------------------------
+// PHOTO GALLERY
+// -----------------------------------------------------------------
+
+enum GalleryCategory {
+  CLASSROOM
+  EVENTS
+  SEMINARS
+  ACHIEVEMENTS
+  RESULTS
+  FACULTY
+  STUDENTS
+  OTHER
+}
+
+model Gallery {
+  id          String          @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  category    GalleryCategory @default(EVENTS)
+  imageFileId String          // GridFS File ObjectId
+  description String?
+  eventDate   DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@map("gallery")
+}
+
+// -----------------------------------------------------------------
+// NOTIFICATIONS & ANNOUNCEMENTS
+// -----------------------------------------------------------------
+
+enum NotificationType {
+  LIVE_CLASS
+  NEW_MATERIAL
+  NEW_TEST
+  TEST_RESULT
+  ANNOUNCEMENT
+  SYSTEM
+}
+
+model Notification {
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  recipientId String           @db.ObjectId
+  recipient   User             @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  title       String
+  message     String
+  type        NotificationType @default(SYSTEM)
+  readAt      DateTime?
+  metadata    String?          // JSON string for deep links (e.g. {"testId": "..."})
+  createdAt   DateTime         @default(now())
+
+  @@map("notifications")
+}
+
+model Announcement {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  content       String
+  targetRole    Role?    // null means all roles
+  courseId      String?  @db.ObjectId
+  course        Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  publishedById String   @db.ObjectId
+  publishedBy   User     @relation(fields: [publishedById], references: [id], onDelete: Restrict)
+  isPinned      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("announcements")
+}
